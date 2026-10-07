@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Embeddings cluster without being told</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#16202a;--mute:#5b6773;--line:#dde2e7;--blue:#2f7df6;--yes:#16805a;--no:#c53b3b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#182029;--ink:#eef2f6;--mute:#9aa6b2;--line:#2a3541;--yes:#4fd1a0;--no:#ff7b7b}}
+:root[data-theme="dark"]{--bg:#10151b;--panel:#182029;--ink:#eef2f6;--mute:#9aa6b2;--line:#2a3541;--yes:#4fd1a0;--no:#ff7b7b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif}
+main{max-width:1040px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.lede{margin:0 0 18px;color:var(--mute);max-width:70ch}
+.bar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+label b{color:var(--ink)}
+input[type=number]{width:104px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+input[type=range]{width:190px;accent-color:var(--blue)}
+.btns{display:flex;gap:8px;margin-left:auto}
+button{font:inherit;font-weight:600;border-radius:8px;padding:8px 18px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+button.go{background:var(--ink);color:var(--bg)}
+button:disabled,input:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#st{margin:12px 2px;color:var(--mute);min-height:1.5em}
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+h2{font-size:17px;margin:0}
+.sub{margin:2px 0 10px;color:var(--mute);font-size:13px}
+canvas{display:block;width:100%;aspect-ratio:1;border-radius:8px}
+.key{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px;color:var(--mute)}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.stats{display:flex;gap:26px;margin:4px 0 10px;color:var(--mute);font-size:13px}
+.stats b{display:block;color:var(--ink);font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 10px 5px 0;border-top:1px solid var(--line)}
+th{color:var(--mute);font-weight:500;font-size:13px;border-top:0}
+.y{color:var(--yes);font-weight:600}.n{color:var(--no);font-weight:600}
+.gr{margin:14px 0 0;font-size:13px;color:var(--mute)}
+.gr b{color:var(--ink)}
+@media(max-width:820px){.two{grid-template-columns:1fr}.btns{margin-left:0}}
+</style>
+</head>
+<body>
+<main>
+<h1>Embeddings cluster without being told</h1>
+<p class="lede">The model only learns to predict the next word of a tiny made-up language. Nobody tells it that cat and dog are both animals, yet words that can be followed by the same things end up next to each other.</p>
+<div class="bar">
+ <label><span>Embedding size: <b id="hv">8</b></span><input id="dim" type="range" min="2" max="16" value="8"></label>
+ <label>Epochs<input id="ep" type="number" min="1" step="1" value="1000"></label>
+ <label>Learning rate<input id="lr" type="number" min="0.0001" step="0.001" value="0.01"></label>
+ <div class="btns"><button id="go" class="go">Train</button><button id="stop" disabled>Stop</button><button id="rs">Reset</button></div>
+</div>
+<div id="st" aria-live="polite"></div>
+<div class="two">
+ <section class="card"><h2>Embedding map</h2><p class="sub" id="msub"></p><canvas id="map"></canvas>
+  <div class="key"><span><i style="background:#2f7df6"></i>animal</span><span><i style="background:#f47c1c"></i>fruit</span><span><i style="background:#1f9d6b"></i>verb</span><span><i style="background:#7b8794"></i>sentence end</span></div></section>
+ <section class="card"><h2>Nearest neighbours</h2><p class="sub">Closest other word by cosine similarity of the learned embeddings.</p>
+  <div class="stats"><div>Same-category neighbour<b id="ok">—</b></div><div>Loss<b id="ls">—</b></div></div>
+  <table><thead><tr><th>Word</th><th>Nearest</th><th>Cosine</th><th>Same category</th></tr></thead><tbody id="nb"></tbody></table>
+  <p class="gr"><b>The language.</b> Every sentence is <b>animal verb animal</b> or <b>animal verb fruit</b>, with any verb allowed. Animals: cat dog cow. Fruits: apple mango. Verbs: eat chase see. Examples: <span id="ex"></span></p>
+  <p class="gr">The model sees one word and predicts the next: embedding, then softmax. Colours are only our labels; the model never sees them.</p></section>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id),TAU=Math.PI*2,V=9;
+function mulberry(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+const gauss=(r=Math.random)=>Math.sqrt(-2*Math.log(1-r()))*Math.cos(TAU*r());
+const WD=['cat','dog','cow','apple','mango','eat','chase','see','.'],CAT=[0,0,0,1,1,2,2,2,3],COL=['#2f7df6','#f47c1c','#1f9d6b','#7b8794'];
+
+/* Corpus: 400 sentences, kept as next-word counts C[current][next] */
+const C=new Float64Array(V*V),T=new Float64Array(V),ex=[];let TOT=0;
+{const r=mulberry(5),add=(a,b)=>{C[a*V+b]++;T[a]++;TOT++};
+ for(let s=0;s<400;s++){const a=r()*3|0,v=5+(r()*3|0),o=r()<.5?r()*3|0:3+(r()*2|0);add(8,a);add(a,v);add(v,o);add(o,8);if(s<3)ex.push(WD[a]+' '+WD[v]+' '+WD[o])}}
+$('ex').textContent=ex.join(', ')+'.';
+
+/* Model: P = [E (V x d) | W (d x V) | b (V)];  logits = E[word] W + b */
+function make(d){const L=2*V*d+V,m={d,P:new Float64Array(L),G:new Float64Array(L),M:new Float64Array(L),S:new Float64Array(L),t:0};
+ for(let i=0;i<V*d;i++)m.P[i]=.1*gauss();for(let i=V*d;i<2*V*d;i++)m.P[i]=.3*gauss();return m}
+function lsm(m,c,lg){const{d,P}=m,Wo=V*d,B=2*V*d;let mx=-1e9;
+ for(let j=0;j<V;j++){let s=P[B+j];for(let k=0;k<d;k++)s+=P[c*d+k]*P[Wo+k*V+j];lg[j]=s;if(s>mx)mx=s}
+ let z=0;for(let j=0;j<V;j++)z+=Math.exp(lg[j]-mx);const lz=mx+Math.log(z);for(let j=0;j<V;j++)lg[j]-=lz}
+const lg=new Float64Array(V);
+function grad(m){const{d,P,G}=m,Wo=V*d,B=2*V*d;G.fill(0);
+ for(let c=0;c<V;c++){if(!T[c])continue;lsm(m,c,lg);
+  for(let j=0;j<V;j++){const dl=(T[c]*Math.exp(lg[j])-C[c*V+j])/TOT;G[B+j]+=dl;for(let k=0;k<d;k++){G[Wo+k*V+j]+=dl*P[c*d+k];G[c*d+k]+=dl*P[Wo+k*V+j]}}}}
+function adam(m,lr){const t=++m.t,c1=1-.9**t,c2=1-.999**t;for(let i=0;i<m.P.length;i++){const g=m.G[i];m.M[i]=.9*m.M[i]+.1*g;m.S[i]=.999*m.S[i]+.001*g*g;m.P[i]-=lr*(m.M[i]/c1)/(Math.sqrt(m.S[i]/c2)+1e-8)}}
+function loss(m){let L=0;for(let c=0;c<V;c++){if(!T[c])continue;lsm(m,c,lg);for(let j=0;j<V;j++)L-=C[c*V+j]*lg[j]}return L/TOT}
+
+/* Centred embeddings, 2D PCA (axes kept consistent between frames), cosine neighbours */
+function cen(m){const{d,P}=m,mu=new Float64Array(d);for(let c=0;c<V;c++)for(let k=0;k<d;k++)mu[k]+=P[c*d+k]/V;
+ return Array.from({length:V},(_,c)=>Float64Array.from({length:d},(_,k)=>P[c*d+k]-mu[k]))}
+const dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);let prev=null;
+function project(m){const d=m.d,Z=cen(m),cov=Array.from({length:d},(_,i)=>Array.from({length:d},(_,j)=>Z.reduce((s,z)=>s+z[i]*z[j],0))),ax=[];
+ for(let a=0;a<2;a++){let v=Array.from({length:d},(_,i)=>1+.37*i+.11*a*i*i);
+  for(let it=0;it<60;it++){let w=cov.map(r=>dot(r,v));for(const u of ax){const p=dot(w,u);w=w.map((x,j)=>x-p*u[j])}const nr=Math.hypot(...w)||1;v=w.map(x=>x/nr)}
+  ax.push(v)}
+ if(prev){if(Math.abs(dot(ax[0],prev[1]))+Math.abs(dot(ax[1],prev[0]))>Math.abs(dot(ax[0],prev[0]))+Math.abs(dot(ax[1],prev[1])))ax.reverse();
+  ax.forEach((u,i)=>{if(dot(u,prev[i])<0)for(let j=0;j<d;j++)u[j]=-u[j]})}
+ prev=ax;return Z.map(z=>[dot(z,ax[0]),dot(z,ax[1])])}
+
+/* Drawing */
+const cv=$('map'),cs=getComputedStyle(document.documentElement),css=v=>cs.getPropertyValue(v).trim();
+function paint(){const g=cv.getContext('2d'),W=cv.width;g.clearRect(0,0,W,W);g.fillStyle=css('--panel');g.fillRect(0,0,W,W);
+ g.strokeStyle=css('--line');g.lineWidth=1;g.beginPath();g.moveTo(W/2,0);g.lineTo(W/2,W);g.moveTo(0,W/2);g.lineTo(W,W/2);g.stroke();
+ const P2=project(m);let mx=1e-9;P2.forEach(p=>mx=Math.max(mx,Math.abs(p[0]),Math.abs(p[1])));
+ const s=.66*W/2/mx,fs=Math.round(W/26),r=W/60,pts=P2.map(p=>[W/2+p[0]*s,W/2-p[1]*s]);
+ g.font=`600 ${fs}px "Avenir Next","Segoe UI",system-ui,sans-serif`;g.textBaseline='middle';
+ pts.forEach((p,i)=>{let k=0;for(let j=0;j<i;j++)if(Math.hypot(p[0]-pts[j][0],p[1]-pts[j][1])<fs*1.1)k++;
+  g.beginPath();g.arc(p[0],p[1],r,0,TAU);g.fillStyle=COL[CAT[i]];g.fill();g.lineWidth=2;g.strokeStyle=css('--panel');g.stroke();
+  g.fillStyle=css('--ink');g.fillText(WD[i],p[0]+r+4,p[1]+k*fs)})}
+function stats(){let rows='',ok=0;const Z=cen(m),nm=Z.map(z=>Math.hypot(...z)||1);
+ for(let i=0;i<8;i++){if(!ep){rows+=`<tr><td>${WD[i]}</td><td>—</td><td>—</td><td>—</td></tr>`;continue}
+  let b=-2,bj=0;for(let j=0;j<8;j++){if(j===i)continue;const s=dot(Z[i],Z[j])/(nm[i]*nm[j]);if(s>b){b=s;bj=j}}
+  const same=CAT[i]===CAT[bj];ok+=same;rows+=`<tr><td>${WD[i]}</td><td>${WD[bj]}</td><td>${b.toFixed(2)}</td><td class="${same?'y':'n'}">${same?'yes':'no'}</td></tr>`}
+ $('nb').innerHTML=rows;$('ok').textContent=ep?`${ok} of 8`:'—';$('ls').textContent=ep?loss(m).toFixed(3):'—';
+ $('msub').textContent=ep?'Learned embeddings projected to 2D with PCA.':'Untrained: these positions come from random starting embeddings.';
+ $('st').textContent=run?`Training: epoch ${ep} of ${target}`:ep?`${ep>=target?'Finished':'Stopped'} at epoch ${ep}`:'Press Train to learn the next-word task and watch the map reorganise.'}
+function draw(){paint();stats()}
+function fit(){const d=window.devicePixelRatio||1,w=Math.round(cv.clientWidth*d);if(cv.width!==w||cv.height!==w)cv.width=cv.height=w;draw()}
+
+/* Training control */
+let m,ep=0,target=0,spf=1,run=false,raf=0;
+const LR=()=>{const v=parseFloat($('lr').value);return v>0?v:.01};
+function ui(){$('go').disabled=run;$('stop').disabled=!run;$('dim').disabled=run}
+function tick(){if(!run)return;const lr=LR();
+ for(let s=0;s<spf&&ep<target;s++){grad(m);adam(m,lr);ep++}
+ draw();if(ep>=target)stop();else raf=requestAnimationFrame(tick)}
+function stop(){run=false;cancelAnimationFrame(raf);ui();draw()}
+function reset(){run=false;cancelAnimationFrame(raf);ep=0;prev=null;const d=+$('dim').value;m=make(d);$('hv').textContent=d;ui();fit()}
+$('go').onclick=()=>{const E=Math.max(1,Math.floor(+$('ep').value)||1000);$('ep').value=E;
+ target=ep<E?E:ep+E;spf=Math.min(50,Math.max(1,Math.ceil((target-ep)/500)));run=true;ui();tick()};
+$('stop').onclick=stop;$('rs').onclick=reset;$('dim').oninput=reset;
+reset();
+new ResizeObserver(fit).observe(document.querySelector('.two'));
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true});
+</script>
+</body>
+</html>

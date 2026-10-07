@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>More data closes the generalization gap</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#16202a;--mute:#5b6773;--line:#dde2e7;--blue:#2f7df6;--orange:#f47c1c;--tr:#1f9d6b;--te:#d14343;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#182029;--ink:#eef2f6;--mute:#9aa6b2;--line:#2a3541;--tr:#4fd1a0;--te:#ff7b7b}}
+:root[data-theme="dark"]{--bg:#10151b;--panel:#182029;--ink:#eef2f6;--mute:#9aa6b2;--line:#2a3541;--tr:#4fd1a0;--te:#ff7b7b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.lede{margin:0 0 18px;color:var(--mute);max-width:72ch}
+.bar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+label b{color:var(--ink)}
+input[type=number]{width:104px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+input[type=range]{width:190px;accent-color:var(--blue)}
+.btns{display:flex;gap:8px;margin-left:auto}
+button{font:inherit;font-weight:600;border-radius:8px;padding:8px 18px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+button.go{background:var(--ink);color:var(--bg)}
+button:disabled,input:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#st{margin:12px 2px;color:var(--mute);min-height:1.5em}
+.panels{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+h2{font-size:17px;margin:0}
+.sub{margin:2px 0 10px;color:var(--mute);font-size:13px}
+canvas{display:block;width:100%;aspect-ratio:1;border-radius:8px}
+#gc{aspect-ratio:2.5}
+.stats{display:flex;gap:18px;margin-top:10px;color:var(--mute);font-size:13px}
+.stats b{display:block;color:var(--ink);font-size:21px;font-variant-numeric:tabular-nums;line-height:1.2}
+.acc{margin:6px 0 0;font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums}
+.col{margin-top:16px}
+#sum{margin:10px 0 0;font-weight:600}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13px;color:var(--mute)}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+@media(max-width:860px){.panels{grid-template-columns:1fr}.btns{margin-left:0}}
+</style>
+</head>
+<body>
+<main>
+<h1>More data closes the generalization gap</h1>
+<p class="lede">A big network can memorize 20 noisy examples perfectly and still be wrong on new ones. Give the same network more examples and the gap between train loss and test loss shrinks.</p>
+<div class="bar">
+ <label><span>Hidden neurons: <b id="hv">128</b></span><input id="hid" type="range" min="16" max="256" step="16" value="128"></label>
+ <label>Epochs<input id="ep" type="number" min="1" step="1" value="1500"></label>
+ <label>Learning rate<input id="lr" type="number" min="0.0001" step="0.001" value="0.01"></label>
+ <div class="btns"><button id="go" class="go">Train</button><button id="stop" disabled>Stop</button><button id="rs">Reset</button></div>
+</div>
+<div id="st" aria-live="polite"></div>
+<div class="panels">
+ <section class="card"><h2>20 training points</h2><p class="sub">Dots are the training data.</p><canvas id="c0"></canvas>
+  <div class="stats"><div>Train loss<b id="tr0">—</b></div><div>Test loss<b id="te0">—</b></div><div>Gap<b id="gp0">—</b></div></div><p class="acc" id="ac0"></p></section>
+ <section class="card"><h2>200 training points</h2><p class="sub">Same network, same start, more data.</p><canvas id="c1"></canvas>
+  <div class="stats"><div>Train loss<b id="tr1">—</b></div><div>Test loss<b id="te1">—</b></div><div>Gap<b id="gp1">—</b></div></div><p class="acc" id="ac1"></p></section>
+ <section class="card"><h2>2000 training points</h2><p class="sub">Too much data to memorize.</p><canvas id="c2"></canvas>
+  <div class="stats"><div>Train loss<b id="tr2">—</b></div><div>Test loss<b id="te2">—</b></div><div>Gap<b id="gp2">—</b></div></div><p class="acc" id="ac2"></p></section>
+</div>
+<section class="card col">
+ <h2>Generalization gap vs dataset size</h2>
+ <p class="sub">Test loss minus train loss, measured on 1,000 fresh points the networks never trained on.</p>
+ <canvas id="gc"></canvas>
+ <div class="key"><span><i style="background:var(--tr)"></i>train loss</span><span><i style="background:var(--te)"></i>test loss</span><span>Shaded band: the gap</span><span>Dashed line: lowest test loss possible with this label noise</span></div>
+ <p id="sum"></p>
+</section>
+<div class="key"><span><i style="background:var(--blue)"></i>Class 0</span><span><i style="background:var(--orange)"></i>Class 1</span><span>Dashed grey curve in each panel: the true rule, shown once training starts. 12% of labels are flipped at random, so no model can be perfect.</span></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),R=1.6,N=40,G=N+1,TAU=Math.PI*2,h=2*R/N,SZ=[20,200,2000],NT=1000,FLOOR=.367;
+const sig=z=>1/(1+Math.exp(-z)),f=x=>.55*Math.sin(2*x);
+function mulberry(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+const gauss=(r=Math.random)=>Math.sqrt(-2*Math.log(1-r()))*Math.cos(TAU*r());
+/* Noisy but learnable data: class = above the curve y=f(x); 12% of labels flipped. Train sets are nested. */
+function gen(seed,k){const r=mulberry(seed),X=new Float64Array(2*k),Y=new Float64Array(k);
+ for(let i=0;i<k;i++){const x=(r()*2-1)*1.5,y=(r()*2-1)*1.5;let c=y>f(x)?1:0;if(r()<.12)c=1-c;X[2*i]=x;X[2*i+1]=y;Y[i]=c}return{X,Y}}
+const TR=gen(3,2000),TS=gen(99,NT),A=new Float64Array(256);
+
+/* One hidden ReLU layer: P = [W1 (x,y per neuron) | b1 | v | c] */
+const mk=(H,P)=>({H,P,G:new Float64Array(P.length),M:new Float64Array(P.length),V:new Float64Array(P.length),t:0});
+function make(H){const P=new Float64Array(4*H+1);for(let i=0;i<H;i++){P[2*i]=gauss();P[2*i+1]=gauss();P[2*H+i]=.8*gauss();P[3*H+i]=gauss()*Math.sqrt(2/H)}return mk(H,P)}
+function logit(m,x,y){const P=m.P,H=m.H;let z=P[4*H];for(let i=0;i<H;i++){const a=P[2*i]*x+P[2*i+1]*y+P[2*H+i];if(a>0)z+=P[3*H+i]*a}return z}
+function grad(m,n){const P=m.P,g=m.G,H=m.H,s=1/n;g.fill(0);
+ for(let k=0;k<n;k++){const x=TR.X[2*k],y=TR.X[2*k+1];
+  let z=P[4*H];for(let i=0;i<H;i++){const a=P[2*i]*x+P[2*i+1]*y+P[2*H+i];A[i]=a>0?a:0;z+=P[3*H+i]*A[i]}
+  const d=(sig(z)-TR.Y[k])*s;g[4*H]+=d;
+  for(let i=0;i<H;i++){g[3*H+i]+=d*A[i];if(A[i]>0){const e=d*P[3*H+i];g[2*i]+=e*x;g[2*i+1]+=e*y;g[2*H+i]+=e}}}}
+function adam(m,lr){const t=++m.t,c1=1-.9**t,c2=1-.999**t;for(let i=0;i<m.P.length;i++){const g=m.G[i];m.M[i]=.9*m.M[i]+.1*g;m.V[i]=.999*m.V[i]+.001*g*g;m.P[i]-=lr*(m.M[i]/c1)/(Math.sqrt(m.V[i]/c2)+1e-8)}}
+function score(m,D,n){let L=0,c=0;for(let k=0;k<n;k++){const z=logit(m,D.X[2*k],D.X[2*k+1]);L+=Math.max(z,0)-D.Y[k]*z+Math.log1p(Math.exp(-Math.abs(z)));if((z>0)===(D.Y[k]===1))c++}return[L/n,c/n]}
+
+/* Drawing */
+const cv=[$('c0'),$('c1'),$('c2')],gc=$('gc'),cs=getComputedStyle(document.documentElement),css=v=>cs.getPropertyValue(v).trim();
+let D=1;
+const off=document.createElement('canvas');off.width=off.height=G;
+const ox=off.getContext('2d'),img=ox.createImageData(G,G),fz=new Float64Array(G*G),pts=[];
+function edge(u,v,x1,y1,x2,y2){if((u>0)!==(v>0)){const t=u/(u-v);pts.push(x1+(x2-x1)*t,y1+(y2-y1)*t)}}
+function paint(i){
+ const c=cv[i],m=ms[i],n=SZ[i],g=c.getContext('2d'),W=c.width,cell=W/N,k=W/(2*R);
+ g.clearRect(0,0,W,W);g.fillStyle=css('--panel');g.fillRect(0,0,W,W);
+ g.strokeStyle=css('--line');g.lineWidth=1;g.beginPath();g.moveTo(W/2,0);g.lineTo(W/2,W);g.moveTo(0,W/2);g.lineTo(W,W/2);g.stroke();
+ if(ep>0){
+  const d=img.data;
+  for(let j=0;j<G;j++)for(let a=0;a<G;a++){const q=j*G+a,z=logit(m,-R+a*h,R-j*h),o=z>0;fz[q]=z;d[4*q]=o?244:47;d[4*q+1]=o?124:125;d[4*q+2]=o?28:246;d[4*q+3]=255*(.1+.3*Math.abs(2*sig(z)-1))}
+  ox.putImageData(img,0,0);g.imageSmoothingEnabled=true;g.drawImage(off,-cell/2,-cell/2,G*cell,G*cell);
+ }
+ const cB=css('--blue'),cO=css('--orange'),big=n>200,r=big?W/230:W/80;g.lineWidth=Math.max(1,W/400);g.strokeStyle=css('--panel');
+ for(let q=0;q<n;q++){g.beginPath();g.arc((TR.X[2*q]+R)*k,(R-TR.X[2*q+1])*k,r,0,TAU);g.fillStyle=TR.Y[q]?cO:cB;g.fill();if(!big)g.stroke()}
+ if(ep>0){
+  g.setLineDash([6*D,5*D]);g.strokeStyle=css('--mute');g.lineWidth=1.5*D;g.beginPath();
+  for(let x=-1.5;x<=1.501;x+=.05){const px=(x+R)*k,py=(R-f(x))*k;x<-1.49?g.moveTo(px,py):g.lineTo(px,py)}g.stroke();g.setLineDash([]);
+  g.beginPath();
+  for(let j=0;j<N;j++)for(let a=0;a<N;a++){
+   const p=fz[j*G+a],b=fz[j*G+a+1],c2=fz[(j+1)*G+a+1],e=fz[(j+1)*G+a];pts.length=0;
+   edge(p,b,a,j,a+1,j);edge(b,c2,a+1,j,a+1,j+1);edge(c2,e,a+1,j+1,a,j+1);edge(e,p,a,j+1,a,j);
+   if(pts.length>=4){g.moveTo(pts[0]*cell,pts[1]*cell);g.lineTo(pts[2]*cell,pts[3]*cell)}
+   if(pts.length===8){g.moveTo(pts[4]*cell,pts[5]*cell);g.lineTo(pts[6]*cell,pts[7]*cell)}}
+  g.lineWidth=Math.max(2.5,W/170);g.lineCap='round';g.strokeStyle=css('--ink');g.stroke();
+ }
+}
+function chart(S){
+ const g=gc.getContext('2d'),W=gc.width,Hh=gc.height,fs=12*D,L=44*D,Rr=W-18*D,T=24*D,B=Hh-30*D;
+ g.clearRect(0,0,W,Hh);g.fillStyle=css('--panel');g.fillRect(0,0,W,Hh);
+ const ymax=S?Math.max(.8,...S.map(s=>s.te*1.2)):1,yy=v=>B-(B-T)*v/ymax,xx=i=>L+(Rr-L)*(.17+.33*i);
+ g.font=`${fs}px "Avenir Next","Segoe UI",system-ui,sans-serif`;g.textBaseline='middle';g.lineWidth=1;
+ for(let t=0;t<=4;t++){const v=ymax*t/4;g.strokeStyle=css('--line');g.beginPath();g.moveTo(L,yy(v));g.lineTo(Rr,yy(v));g.stroke();g.fillStyle=css('--mute');g.textAlign='right';g.fillText(v.toFixed(1),L-8*D,yy(v))}
+ g.textAlign='center';SZ.forEach((s,i)=>{g.fillStyle=css('--mute');g.fillText(s+' points',xx(i),B+16*D)});
+ g.setLineDash([6*D,5*D]);g.strokeStyle=css('--mute');g.lineWidth=1.5*D;g.beginPath();g.moveTo(L,yy(FLOOR));g.lineTo(Rr,yy(FLOOR));g.stroke();g.setLineDash([]);
+ if(!S)return;
+ g.globalAlpha=.16;g.fillStyle=css('--te');g.beginPath();S.forEach((s,i)=>i?g.lineTo(xx(i),yy(s.te)):g.moveTo(xx(i),yy(s.te)));
+ for(let i=2;i>=0;i--)g.lineTo(xx(i),yy(S[i].tr));g.fill();g.globalAlpha=1;
+ for(const [key,col] of [['tr','--tr'],['te','--te']]){g.strokeStyle=g.fillStyle=css(col);g.lineWidth=2.5*D;g.beginPath();
+  S.forEach((s,i)=>i?g.lineTo(xx(i),yy(s[key])):g.moveTo(xx(i),yy(s[key])));g.stroke();
+  S.forEach((s,i)=>{g.beginPath();g.arc(xx(i),yy(s[key]),5*D,0,TAU);g.fill()})}
+ g.font=`600 ${fs}px "Avenir Next","Segoe UI",system-ui,sans-serif`;g.fillStyle=css('--ink');g.textAlign='center';
+ S.forEach((s,i)=>g.fillText('gap '+(s.te-s.tr).toFixed(2),xx(i),yy(s.te)-13*D));
+}
+function draw(){
+ for(let i=0;i<3;i++)paint(i);
+ const S=ep?ms.map((m,i)=>{const a=score(m,TR,SZ[i]),b=score(m,TS,NT);return{tr:a[0],te:b[0],atr:a[1],ate:b[1]}}):null;
+ for(let i=0;i<3;i++){const s=S&&S[i];
+  $('tr'+i).textContent=s?s.tr.toFixed(3):'—';$('te'+i).textContent=s?s.te.toFixed(2):'—';$('gp'+i).textContent=s?(s.te-s.tr).toFixed(2):'—';
+  $('ac'+i).textContent=s?`Accuracy: train ${(s.atr*100).toFixed(0)}%, test ${(s.ate*100).toFixed(0)}%`:''}
+ chart(S);
+ $('sum').textContent=S?`Gap: ${(S[0].te-S[0].tr).toFixed(2)} at 20 points, ${(S[1].te-S[1].tr).toFixed(2)} at 200 points, ${(S[2].te-S[2].tr).toFixed(2)} at 2000 points.`:'';
+ $('st').textContent=run?`Training: epoch ${ep} of ${target}`:ep?`${ep>=target?'Finished':'Stopped'} at epoch ${ep}`:'Press Train. All three networks start from the same weights and differ only in how much data they see.';
+}
+function fit(){D=window.devicePixelRatio||1;for(const c of [...cv,gc]){const w=Math.round(c.clientWidth*D),hh=Math.round(c.clientHeight*D);if(c.width!==w||c.height!==hh){c.width=w;c.height=hh}}draw()}
+
+/* Training control */
+let ms,ep=0,target=0,spf=1,run=false,raf=0;
+const LR=()=>{const v=parseFloat($('lr').value);return v>0?v:.01};
+function ui(){$('go').disabled=run;$('stop').disabled=!run;$('hid').disabled=run}
+function tick(){if(!run)return;const lr=LR();
+ for(let s=0;s<spf&&ep<target;s++){ms.forEach((m,i)=>{grad(m,SZ[i]);adam(m,lr)});ep++}
+ draw();if(ep>=target)stop();else raf=requestAnimationFrame(tick)}
+function stop(){run=false;cancelAnimationFrame(raf);ui();draw()}
+function reset(){run=false;cancelAnimationFrame(raf);ep=0;const H=+$('hid').value,b=make(H);
+ ms=SZ.map(()=>mk(H,b.P.slice()));$('hv').textContent=H;ui();fit()}
+$('go').onclick=()=>{const E=Math.max(1,Math.floor(+$('ep').value)||1500);$('ep').value=E;
+ target=ep<E?E:ep+E;spf=Math.min(50,Math.max(1,Math.ceil((target-ep)/500)));run=true;ui();tick()};
+$('stop').onclick=stop;$('rs').onclick=reset;$('hid').oninput=reset;
+reset();
+new ResizeObserver(fit).observe(document.querySelector('main'));
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true});
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Five linear layers are still one line</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#16202a;--mute:#5b6773;--line:#dde2e7;--blue:#2f7df6;--orange:#f47c1c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#182029;--ink:#eef2f6;--mute:#9aa6b2;--line:#2a3541}}
+:root[data-theme="dark"]{--bg:#10151b;--panel:#182029;--ink:#eef2f6;--mute:#9aa6b2;--line:#2a3541}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.lede{margin:0 0 18px;color:var(--mute);max-width:70ch}
+.bar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+label b{color:var(--ink)}
+input[type=number]{width:104px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+input[type=range]{width:190px;accent-color:var(--blue)}
+.btns{display:flex;gap:8px;margin-left:auto}
+button{font:inherit;font-weight:600;border-radius:8px;padding:8px 18px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+button.go{background:var(--ink);color:var(--bg)}
+button:disabled,input:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#st{margin:12px 2px;color:var(--mute);min-height:1.5em}
+.panels{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+h2{font-size:17px;margin:0}
+.sub{margin:2px 0 10px;color:var(--mute);font-size:13px}
+canvas{display:block;width:100%;aspect-ratio:1;border-radius:8px}
+.stats{display:flex;gap:26px;margin-top:10px;color:var(--mute);font-size:13px}
+.stats b{display:block;color:var(--ink);font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
+.col{margin-top:16px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 18px 8px 0;border-top:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:500;font-size:13px;border-top:0}
+#vd{margin:10px 0 0;color:var(--ink);font-weight:600}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;font-size:13px;color:var(--mute)}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+@media(max-width:860px){.panels{grid-template-columns:1fr}.btns{margin-left:0}}
+</style>
+</head>
+<body>
+<main>
+<h1>Five linear layers are still one line</h1>
+<p class="lede">Stacked linear layers multiply out to a single matrix, so depth alone cannot bend a boundary. Train three models on the same ring data: one linear layer, five linear layers, and the same five layers with ReLU between them.</p>
+<div class="bar">
+ <label><span>Neurons per hidden layer: <b id="hv">8</b></span><input id="hid" type="range" min="2" max="16" value="8"></label>
+ <label>Epochs<input id="ep" type="number" min="1" step="1" value="1500"></label>
+ <label>Learning rate<input id="lr" type="number" min="0.0001" step="0.001" value="0.01"></label>
+ <div class="btns"><button id="go" class="go">Train</button><button id="stop" disabled>Stop</button><button id="rs">Reset</button></div>
+</div>
+<div id="st" aria-live="polite"></div>
+<div class="panels">
+ <section class="card"><h2>1 linear layer + Sigmoid</h2><p class="sub">One weight matrix, so one straight line.</p><canvas id="c0"></canvas>
+  <div class="stats"><div>Accuracy<b id="a0">—</b></div><div>Loss<b id="l0">—</b></div></div></section>
+ <section class="card"><h2>5 linear layers + Sigmoid</h2><p class="sub">Five stacked matrices, no activation between them.</p><canvas id="c1"></canvas>
+  <div class="stats"><div>Accuracy<b id="a1">—</b></div><div>Loss<b id="l1">—</b></div></div></section>
+ <section class="card"><h2>5 layers + ReLU</h2><p class="sub">The same five layers, with ReLU between them.</p><canvas id="c2"></canvas>
+  <div class="stats"><div>Accuracy<b id="a2">—</b></div><div>Loss<b id="l2">—</b></div></div></section>
+</div>
+<section class="card col">
+ <h2>Multiply the weight matrices</h2>
+ <p class="sub" id="chain"></p>
+ <div class="tw"><table>
+  <tr><th>Model</th><th>Product of its weight matrices</th><th>Combined bias</th><th>Largest gap to the real network</th></tr>
+  <tr><td>1 linear layer</td><td id="p0"></td><td id="b0"></td><td id="g0"></td></tr>
+  <tr><td>5 linear layers</td><td id="p1"></td><td id="b1"></td><td id="g1"></td></tr>
+  <tr><td>5 layers + ReLU</td><td id="p2"></td><td id="b2"></td><td id="g2"></td></tr>
+ </table></div>
+ <p class="sub" style="margin:10px 0 0">The gap is measured on all 300 points. For the linear stack it stays at rounding error, because the product really is the whole model. With ReLU between the layers the product no longer describes the network.</p>
+ <p id="vd"></p>
+</section>
+<div class="key"><span><i style="background:var(--blue)"></i>Class 0, inner ring</span><span><i style="background:var(--orange)"></i>Class 1, outer ring</span><span>All three models train with Adam on the same 300 points, one update per epoch.</span></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),R=1.6,N=56,G=N+1,n=300,TAU=Math.PI*2,h=2*R/N;
+const sig=z=>1/(1+Math.exp(-z));
+function mulberry(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+const gauss=(r=Math.random)=>Math.sqrt(-2*Math.log(1-r()))*Math.cos(TAU*r());
+const X=new Float64Array(2*n),Y=new Float64Array(n);
+{const r=mulberry(11);for(let k=0;k<n;k++){const c=k<n/2?0:1,rad=c?1:.5,a=r()*TAU;Y[k]=c;X[2*k]=rad*Math.cos(a)+.1*gauss(r);X[2*k+1]=rad*Math.sin(a)+.1*gauss(r)}}
+
+/* Dense net: S = layer sizes, relu = ReLU between layers (never after the last one) */
+function make(S,relu){const L=S.length-1,o=[],bo=[];let T=0;
+ for(let l=0;l<L;l++){o.push(T);T+=S[l]*S[l+1];bo.push(T);T+=S[l+1]}
+ const m={S,L,relu,o,bo,P:new Float64Array(T),G:new Float64Array(T),M:new Float64Array(T),V:new Float64Array(T),t:0,a:S.map(s=>new Float64Array(s)),d:S.slice(1).map(s=>new Float64Array(s))};
+ for(let l=0;l<L;l++){const sd=Math.sqrt((relu?2:1)/S[l]);for(let i=0;i<S[l]*S[l+1];i++)m.P[o[l]+i]=sd*gauss()}
+ return m}
+function fwd(m,x,y){const a=m.a,P=m.P,S=m.S;a[0][0]=x;a[0][1]=y;
+ for(let l=0;l<m.L;l++){const i=S[l],q=S[l+1],B=m.bo[l],pi=a[l],po=a[l+1],hid=m.relu&&l<m.L-1;
+  for(let r=0;r<q;r++){let s=P[B+r];const w=m.o[l]+r*i;for(let c=0;c<i;c++)s+=P[w+c]*pi[c];po[r]=hid&&s<0?0:s}}
+ return a[m.L][0]}
+function grad(m){const{S,L,P,G,o,bo,a,d}=m,s0=1/n;G.fill(0);
+ for(let k=0;k<n;k++){const z=fwd(m,X[2*k],X[2*k+1]);d[L-1][0]=(sig(z)-Y[k])*s0;
+  for(let l=L-1;l>=0;l--){const i=S[l],q=S[l+1],dl=d[l],pi=a[l];
+   for(let r=0;r<q;r++){const g=dl[r],w=o[l]+r*i;G[bo[l]+r]+=g;for(let c=0;c<i;c++)G[w+c]+=g*pi[c]}
+   if(l>0){const dp=d[l-1];for(let c=0;c<i;c++){let s=0;for(let r=0;r<q;r++)s+=P[o[l]+r*i+c]*dl[r];dp[c]=m.relu&&pi[c]<=0?0:s}}}}}
+function adam(m,lr){const t=++m.t,c1=1-.9**t,c2=1-.999**t;for(let i=0;i<m.P.length;i++){const g=m.G[i];m.M[i]=.9*m.M[i]+.1*g;m.V[i]=.999*m.V[i]+.001*g*g;m.P[i]-=lr*(m.M[i]/c1)/(Math.sqrt(m.V[i]/c2)+1e-8)}}
+function score(m){let L=0,c=0;for(let k=0;k<n;k++){const z=fwd(m,X[2*k],X[2*k+1]);L+=Math.max(z,0)-Y[k]*z+Math.log1p(Math.exp(-Math.abs(z)));if((z>0)===(Y[k]===1))c++}return[c/n,L/n]}
+
+/* Multiply the weight matrices W_L ... W_1 (and fold the biases the same way) into [w1, w2, bias] */
+function collapse(m){const{S,P}=m;let M=P.slice(m.o[0],m.o[0]+S[1]*2),bv=P.slice(m.bo[0],m.bo[0]+S[1]);
+ for(let l=1;l<m.L;l++){const i=S[l],q=S[l+1],W=m.o[l],B=m.bo[l],M2=new Float64Array(q*2),b2=new Float64Array(q);
+  for(let r=0;r<q;r++){let s=P[B+r];for(let c=0;c<i;c++){const w=P[W+r*i+c];M2[2*r]+=w*M[2*c];M2[2*r+1]+=w*M[2*c+1];s+=w*bv[c]}b2[r]=s}
+  M=M2;bv=b2}
+ return[M[0],M[1],bv[0]]}
+function gap(m,c){let g=0;for(let k=0;k<n;k++){const x=X[2*k],y=X[2*k+1];g=Math.max(g,Math.abs(fwd(m,x,y)-(c[0]*x+c[1]*y+c[2])))}return g}
+const fmt=g=>g<1e-3?g.toExponential(1):g.toFixed(2);
+
+/* Drawing */
+const cv=[$('c0'),$('c1'),$('c2')],cs=getComputedStyle(document.documentElement),css=v=>cs.getPropertyValue(v).trim();
+const off=document.createElement('canvas');off.width=off.height=G;
+const ox=off.getContext('2d'),img=ox.createImageData(G,G),f=new Float64Array(G*G),pts=[];
+function edge(u,v,x1,y1,x2,y2){if((u>0)!==(v>0)){const t=u/(u-v);pts.push(x1+(x2-x1)*t,y1+(y2-y1)*t)}}
+function paint(c,m){
+ const g=c.getContext('2d'),W=c.width,cell=W/N,k=W/(2*R);
+ g.clearRect(0,0,W,W);g.fillStyle=css('--panel');g.fillRect(0,0,W,W);
+ g.strokeStyle=css('--line');g.lineWidth=1;g.beginPath();g.moveTo(W/2,0);g.lineTo(W/2,W);g.moveTo(0,W/2);g.lineTo(W,W/2);g.stroke();
+ if(ep>0){ /* shaded decision regions: only after training has started */
+  const d=img.data;
+  for(let j=0;j<G;j++)for(let i=0;i<G;i++){const q=j*G+i,z=fwd(m,-R+i*h,R-j*h),o=z>0;f[q]=z;d[4*q]=o?244:47;d[4*q+1]=o?124:125;d[4*q+2]=o?28:246;d[4*q+3]=255*(.1+.3*Math.abs(2*sig(z)-1))}
+  ox.putImageData(img,0,0);g.imageSmoothingEnabled=true;g.drawImage(off,-cell/2,-cell/2,G*cell,G*cell);
+ }
+ const cB=css('--blue'),cO=css('--orange'),r=W/110;g.lineWidth=Math.max(1,W/400);g.strokeStyle=css('--panel');
+ for(let q=0;q<n;q++){g.beginPath();g.arc((X[2*q]+R)*k,(R-X[2*q+1])*k,r,0,TAU);g.fillStyle=Y[q]?cO:cB;g.fill();g.stroke()}
+ if(ep>0){ /* the p=0.5 decision boundary */
+  g.beginPath();
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+   const a=f[j*G+i],b=f[j*G+i+1],c2=f[(j+1)*G+i+1],e=f[(j+1)*G+i];pts.length=0;
+   edge(a,b,i,j,i+1,j);edge(b,c2,i+1,j,i+1,j+1);edge(c2,e,i+1,j+1,i,j+1);edge(e,a,i,j+1,i,j);
+   if(pts.length>=4){g.moveTo(pts[0]*cell,pts[1]*cell);g.lineTo(pts[2]*cell,pts[3]*cell)}
+   if(pts.length===8){g.moveTo(pts[4]*cell,pts[5]*cell);g.lineTo(pts[6]*cell,pts[7]*cell)}}
+  g.lineWidth=Math.max(2.5,W/170);g.lineCap='round';g.strokeStyle=css('--ink');g.stroke();
+ }
+}
+function draw(){
+ cv.forEach((c,i)=>paint(c,ms[i]));
+ const acc=[];
+ ms.forEach((m,i)=>{const s=ep?score(m):null;acc[i]=s&&s[0];$('a'+i).textContent=s?(s[0]*100).toFixed(1)+'%':'—';$('l'+i).textContent=s?s[1].toFixed(3):'—';
+  if(ep){const c=collapse(m);$('p'+i).textContent=`[ ${c[0].toFixed(3)}   ${c[1].toFixed(3)} ]`;$('b'+i).textContent=c[2].toFixed(3);$('g'+i).textContent=fmt(gap(m,c))}
+  else for(const t of'pbg')$(t+i).textContent='—'});
+ $('vd').textContent=ep?`1 layer vs 5 linear layers: accuracy differs by ${(Math.abs(acc[0]-acc[1])*100).toFixed(1)} points. Adding ReLU lifts accuracy by ${((acc[2]-acc[1])*100).toFixed(1)} points.`:'';
+ $('st').textContent=run?`Training: epoch ${ep} of ${target}`:ep?`${ep>=target?'Finished':'Stopped'} at epoch ${ep}`:'Press Train to fit all three models. No boundary appears until training starts.';
+}
+function fit(){const d=window.devicePixelRatio||1;for(const c of cv){const w=Math.round(c.clientWidth*d);if(c.width!==w||c.height!==w)c.width=c.height=w}draw()}
+
+/* Training control */
+let ms,ep=0,target=0,spf=1,run=false,raf=0;
+const LR=()=>{const v=parseFloat($('lr').value);return v>0?v:.01};
+function ui(){$('go').disabled=run;$('stop').disabled=!run;$('hid').disabled=run}
+function tick(){if(!run)return;const lr=LR();
+ for(let s=0;s<spf&&ep<target;s++){for(const m of ms){grad(m);adam(m,lr)}ep++}
+ draw();if(ep>=target)stop();else raf=requestAnimationFrame(tick)}
+function stop(){run=false;cancelAnimationFrame(raf);ui();draw()}
+function reset(){run=false;cancelAnimationFrame(raf);ep=0;const H=+$('hid').value,S=[2,H,H,H,H,1];
+ ms=[make([2,1],0),make(S,0),make(S,1)];
+ $('hv').textContent=H;$('chain').textContent=`W5 (1×${H}), W4 (${H}×${H}), W3 (${H}×${H}), W2 (${H}×${H}) and W1 (${H}×2) multiply out to one 1×2 matrix. The five bias vectors fold into one number the same way.`;ui();fit()}
+$('go').onclick=()=>{const E=Math.max(1,Math.floor(+$('ep').value)||1500);$('ep').value=E;
+ target=ep<E?E:ep+E;spf=Math.min(50,Math.max(1,Math.ceil((target-ep)/500)));run=true;ui();tick()};
+$('stop').onclick=stop;$('rs').onclick=reset;$('hid').oninput=reset;
+reset();
+new ResizeObserver(fit).observe(document.querySelector('.panels'));
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true});
+</script>
+</body>
+</html>
